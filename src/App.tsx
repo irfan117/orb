@@ -6,7 +6,6 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { ContentProvider } from './contexts/ContentContext';
 import LandingPage from './components/LandingPage';
 import AdminPanel from './components/AdminPanel';
-import SetupPanel from './components/SetupPanel';
 import DatabaseSetup from './components/DatabaseSetup';
 import AdminSetup from './components/AdminSetup';
 import Notifications from './components/Notifications';
@@ -21,20 +20,61 @@ function App() {
   const [setupStep, setSetupStep] = useState<SetupStep>('database');
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check setup status on app load
-    const savedSetupStep = localStorage.getItem('setup_step');
-    if (savedSetupStep === 'complete') {
-      setIsSetupComplete(true);
-      // Check admin session
-      const adminSession = localStorage.getItem('admin_session');
-      setIsAdminLoggedIn(adminSession === 'true');
-    } else if (savedSetupStep === 'admin') {
-      setSetupStep('admin');
-    } else {
-      setSetupStep('database');
-    }
+    const initializeApp = async () => {
+      // Check if Supabase connection exists
+      const savedConnection = localStorage.getItem('orb_supabase_connection');
+      const savedSetupStep = localStorage.getItem('setup_step');
+
+      if (savedConnection && savedSetupStep === 'complete') {
+        try {
+          // Validate connection by testing it
+          const { url, key } = JSON.parse(savedConnection);
+          if (url && key) {
+            // Test connection (simple validation)
+            const testResponse = await fetch(`${url}/rest/v1/`, {
+              method: 'HEAD',
+              headers: {
+                'apikey': key,
+                'Authorization': `Bearer ${key}`
+              }
+            });
+
+            if (testResponse.ok) {
+              // Connection is valid, skip setup
+              setIsSetupComplete(true);
+              const adminSession = localStorage.getItem('admin_session');
+              setIsAdminLoggedIn(adminSession === 'true');
+            } else {
+              // Connection invalid, reset to setup
+              localStorage.removeItem('orb_supabase_connection');
+              localStorage.removeItem('setup_step');
+              setSetupStep('database');
+            }
+          } else {
+            // Invalid connection data, reset to setup
+            localStorage.removeItem('orb_supabase_connection');
+            localStorage.removeItem('setup_step');
+            setSetupStep('database');
+          }
+        } catch (error) {
+          console.error('Connection validation failed:', error);
+          // Reset to setup on error
+          localStorage.removeItem('orb_supabase_connection');
+          localStorage.removeItem('setup_step');
+          setSetupStep('database');
+        }
+      } else {
+        // No connection or incomplete setup, start from database setup
+        setSetupStep('database');
+      }
+
+      setIsLoading(false);
+    };
+
+    initializeApp();
 
     // Add keyboard shortcut for admin access (Ctrl+Shift+A)
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -97,6 +137,20 @@ function App() {
     },
   };
 
+  // Show loading while checking connection
+  if (isLoading) {
+    return (
+      <ConfigProvider theme={theme}>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-slate-600">Loading ORB...</p>
+          </div>
+        </div>
+      </ConfigProvider>
+    );
+  }
+
   // Show setup components if setup is not complete
   if (!isSetupComplete) {
     if (setupStep === 'database') {
@@ -128,8 +182,6 @@ function App() {
               <UserNavigation onAdminLogin={() => setCurrentPage('admin')} />
             )}
 
-            {/* Setup Panel */}
-            <SetupPanel />
 
             {/* Main Content */}
             <main>
