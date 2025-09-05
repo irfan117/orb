@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Router, BookOpen, Database, Settings, Home, LogIn } from 'lucide-react';
 import { ConfigProvider } from 'antd';
-import { ConnectionProvider } from './contexts/ConnectionContext';
+import { ConnectionProvider, useConnection } from './contexts/ConnectionContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ContentProvider } from './contexts/ContentContext';
 import LandingPage from './components/LandingPage';
 import AdminPanel from './components/AdminPanel';
 import DatabaseSetup from './components/DatabaseSetup';
-import AdminSetup from './components/AdminSetup';
 import Notifications from './components/Notifications';
 import UserNavigation from './components/UserNavigation';
 import AdminNavigation from './components/AdminNavigation';
 
 type Page = 'home' | 'admin';
-type SetupStep = 'database' | 'admin' | 'complete';
+type SetupStep = 'database' | 'complete';
 
-function App() {
+function AppContent() {
+  const { testConnection } = useConnection();
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [setupStep, setSetupStep] = useState<SetupStep>('database');
   const [isSetupComplete, setIsSetupComplete] = useState(false);
@@ -33,16 +33,10 @@ function App() {
           // Validate connection by testing it
           const { url, key } = JSON.parse(savedConnection);
           if (url && key) {
-            // Test connection (simple validation)
-            const testResponse = await fetch(`${url}/rest/v1/`, {
-              method: 'HEAD',
-              headers: {
-                'apikey': key,
-                'Authorization': `Bearer ${key}`
-              }
-            });
+            // Use robust connection test from ConnectionContext
+            const isValid = await testConnection(url, key);
 
-            if (testResponse.ok) {
+            if (isValid) {
               // Connection is valid, skip setup
               setIsSetupComplete(true);
               const adminSession = localStorage.getItem('admin_session');
@@ -67,7 +61,7 @@ function App() {
           setSetupStep('database');
         }
       } else {
-        // No connection or incomplete setup, start from database setup
+        // No saved connection found, start database setup
         setSetupStep('database');
       }
 
@@ -86,7 +80,7 @@ function App() {
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [isSetupComplete]);
+  }, [testConnection]);
 
   const handleAdminLogin = (success: boolean) => {
     if (success) {
@@ -101,29 +95,17 @@ function App() {
   };
 
   const handleDatabaseSetupComplete = async (config: { supabaseUrl: string; supabaseAnonKey: string }) => {
-    // Save to localStorage for setup tracking
-    localStorage.setItem('db_config', JSON.stringify(config));
-    localStorage.setItem('setup_step', 'admin');
-
-    setSetupStep('admin');
-  };
-
-  const handleAdminSetupComplete = async () => {
-    // Get saved database config and connect to Supabase
-    const dbConfig = localStorage.getItem('db_config');
-    if (dbConfig) {
-      const { supabaseUrl, supabaseAnonKey } = JSON.parse(dbConfig);
-
-      // Save connection for ConnectionContext to pick up
-      localStorage.setItem('orb_supabase_connection', JSON.stringify({
-        url: supabaseUrl,
-        key: supabaseAnonKey
-      }));
-    }
+    // Save connection directly to localStorage
+    localStorage.setItem('orb_supabase_connection', JSON.stringify({
+      url: config.supabaseUrl,
+      key: config.supabaseAnonKey
+    }));
+    localStorage.setItem('setup_step', 'complete');
 
     setIsSetupComplete(true);
     setCurrentPage('home');
   };
+
 
   const theme = {
     token: {
@@ -159,20 +141,12 @@ function App() {
           <DatabaseSetup onComplete={handleDatabaseSetupComplete} />
         </ConfigProvider>
       );
-    } else if (setupStep === 'admin') {
-      return (
-        <ConfigProvider theme={theme}>
-          <AdminSetup onComplete={handleAdminSetupComplete} />
-        </ConfigProvider>
-      );
     }
   }
 
   return (
     <ConfigProvider theme={theme}>
-      <NotificationProvider>
-        <ConnectionProvider>
-          <ContentProvider>
+      <ContentProvider>
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
             {/* Show notifications only on admin pages */}
             {(currentPage === 'admin' && isAdminLoggedIn) && <Notifications />}
@@ -196,10 +170,18 @@ function App() {
               )}
             </main>
           </div>
-          </ContentProvider>
-        </ConnectionProvider>
-      </NotificationProvider>
-    </ConfigProvider>
+         </ContentProvider>
+   </ConfigProvider>
+ );
+}
+
+function App() {
+  return (
+    <NotificationProvider>
+      <ConnectionProvider>
+        <AppContent />
+      </ConnectionProvider>
+    </NotificationProvider>
   );
 }
 
