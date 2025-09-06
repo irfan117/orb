@@ -1,69 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { Router, BookOpen, Database, Settings, Home, LogIn } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { ConfigProvider } from 'antd';
 import { ConnectionProvider, useConnection } from './contexts/ConnectionContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ContentProvider } from './contexts/ContentContext';
 import LandingPage from './components/LandingPage';
 import AdminPanel from './components/AdminPanel';
-import DatabaseSetup from './components/DatabaseSetup';
 import Notifications from './components/Notifications';
 import UserNavigation from './components/UserNavigation';
-import AdminNavigation from './components/AdminNavigation';
 
 type Page = 'home' | 'admin';
-type SetupStep = 'database' | 'complete';
 
 function AppContent() {
-  const { testConnection } = useConnection();
   const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [setupStep, setSetupStep] = useState<SetupStep>('database');
-  const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initializeApp = async () => {
-      // Check if Supabase connection exists
-      const savedConnection = localStorage.getItem('orb_supabase_connection');
-      const savedSetupStep = localStorage.getItem('setup_step');
-
-      if (savedConnection && savedSetupStep === 'complete') {
-        try {
-          // Validate connection by testing it
-          const { url, key } = JSON.parse(savedConnection);
-          if (url && key) {
-            // Use robust connection test from ConnectionContext
-            const isValid = await testConnection(url, key);
-
-            if (isValid) {
-              // Connection is valid, skip setup
-              setIsSetupComplete(true);
-              const adminSession = localStorage.getItem('admin_session');
-              setIsAdminLoggedIn(adminSession === 'true');
-            } else {
-              // Connection invalid, reset to setup
-              localStorage.removeItem('orb_supabase_connection');
-              localStorage.removeItem('setup_step');
-              setSetupStep('database');
-            }
-          } else {
-            // Invalid connection data, reset to setup
-            localStorage.removeItem('orb_supabase_connection');
-            localStorage.removeItem('setup_step');
-            setSetupStep('database');
-          }
-        } catch (error) {
-          console.error('Connection validation failed:', error);
-          // Reset to setup on error
-          localStorage.removeItem('orb_supabase_connection');
-          localStorage.removeItem('setup_step');
-          setSetupStep('database');
-        }
-      } else {
-        // No saved connection found, start database setup
-        setSetupStep('database');
-      }
+      // Check admin session
+      const adminSession = localStorage.getItem('admin_session');
+      setIsAdminLoggedIn(adminSession === 'true');
 
       setIsLoading(false);
     };
@@ -72,7 +28,7 @@ function AppContent() {
 
     // Add keyboard shortcut for admin access (Ctrl+Shift+A)
     const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key === 'A' && isSetupComplete) {
+      if (event.ctrlKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
         setCurrentPage('admin');
       }
@@ -80,29 +36,12 @@ function AppContent() {
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [testConnection]);
+  }, []);
 
-  const handleAdminLogin = (success: boolean) => {
-    if (success) {
-      setIsAdminLoggedIn(true);
-    }
-  };
 
   const handleAdminLogout = () => {
     localStorage.removeItem('admin_session');
     setIsAdminLoggedIn(false);
-    setCurrentPage('home');
-  };
-
-  const handleDatabaseSetupComplete = async (config: { supabaseUrl: string; supabaseAnonKey: string }) => {
-    // Save connection directly to localStorage
-    localStorage.setItem('orb_supabase_connection', JSON.stringify({
-      url: config.supabaseUrl,
-      key: config.supabaseAnonKey
-    }));
-    localStorage.setItem('setup_step', 'complete');
-
-    setIsSetupComplete(true);
     setCurrentPage('home');
   };
 
@@ -131,17 +70,6 @@ function AppContent() {
         </div>
       </ConfigProvider>
     );
-  }
-
-  // Show setup components if setup is not complete
-  if (!isSetupComplete) {
-    if (setupStep === 'database') {
-      return (
-        <ConfigProvider theme={theme}>
-          <DatabaseSetup onComplete={handleDatabaseSetupComplete} />
-        </ConfigProvider>
-      );
-    }
   }
 
   return (

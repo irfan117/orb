@@ -4,7 +4,6 @@ import { DatabaseOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-des
 import { useConnection } from '../contexts/ConnectionContext';
 
 const { Title, Paragraph } = Typography;
-const { TextArea } = Input;
 
 interface DatabaseConfig {
   supabaseUrl: string;
@@ -22,6 +21,20 @@ const DatabaseSetup: React.FC<DatabaseSetupProps> = ({ onComplete }) => {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [autoSetupLoading, setAutoSetupLoading] = useState(true);
+
+  // Safety check: If setup is already complete, don't render this component
+  const savedSetupStep = localStorage.getItem('setup_step');
+  const savedConnection = localStorage.getItem('orb_supabase_connection');
+  if (savedSetupStep === 'complete' && savedConnection) {
+    // Auto-complete setup if we somehow got here
+    try {
+      const { url, key } = JSON.parse(savedConnection);
+      onComplete({ supabaseUrl: url, supabaseAnonKey: key });
+    } catch (error) {
+      console.error('Error parsing saved connection:', error);
+    }
+    return null;
+  }
 
   // Check for existing working connection on component mount
   useEffect(() => {
@@ -76,7 +89,7 @@ const DatabaseSetup: React.FC<DatabaseSetupProps> = ({ onComplete }) => {
       const supabase = createClient(values.supabaseUrl, values.supabaseAnonKey);
 
       // Test basic connectivity by trying to get project info
-      const { data, error } = await supabase.auth.getSession();
+      const { data: _, error } = await supabase.auth.getSession();
 
       if (error) {
         throw error;
@@ -102,6 +115,7 @@ const DatabaseSetup: React.FC<DatabaseSetupProps> = ({ onComplete }) => {
       // Save configuration to localStorage for demo
       localStorage.setItem('db_config', JSON.stringify(values));
       localStorage.setItem('setup_step', 'complete');
+      localStorage.setItem('orb_setup_permanent', 'true');
 
       onComplete(values);
     } catch (error) {

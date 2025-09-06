@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { useNotifications } from './NotificationContext';
 
@@ -44,28 +44,16 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isConnecting, setIsConnecting] = useState(false);
   const { addNotification } = useNotifications();
 
-  // Load saved connection on mount
+  // Load connection on mount with hardcoded values
   useEffect(() => {
     let isMounted = true;
 
     const loadConnection = async () => {
-      const savedConnection = localStorage.getItem('orb_supabase_connection');
-      if (savedConnection) {
-        try {
-          const { url, key } = JSON.parse(savedConnection);
-          if (url && key && isMounted) {
-            await connect(url, key);
-          } else if (isMounted) {
-            setShowSetupPanel(true);
-          }
-        } catch (error) {
-          console.error('Error loading saved connection:', error);
-          if (isMounted) {
-            setShowSetupPanel(true);
-          }
-        }
-      } else if (isMounted) {
-        setShowSetupPanel(true);
+      const hardcodedUrl = 'https://tuwyoewupssmdkhrlybj.supabase.co';
+      const hardcodedKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1d3lvZXd1cHNzbWRraHJseWJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNTk4MjUsImV4cCI6MjA3MjYzNTgyNX0.xOyp_jROqPHdVdw6AYGJHhuaUw-hBnK7e34EJqjMOfI';
+
+      if (isMounted) {
+        await connect(hardcodedUrl, hardcodedKey);
       }
     };
 
@@ -96,7 +84,7 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
 
       // Test basic connectivity by checking auth session
-      const { data, error } = await client.auth.getSession();
+      const { data: _, error } = await client.auth.getSession();
 
       if (error) {
         throw error;
@@ -208,7 +196,7 @@ export const ConnectionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setSupabaseClient(client);
 
       // Get project info
-      const { data: projectData } = await client.from('books').select('*').limit(1);
+      const { data: _ } = await client.from('books').select('*').limit(1);
       
       setConnectionState({
         isConnected: true,
