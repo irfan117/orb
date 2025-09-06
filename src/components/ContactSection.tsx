@@ -121,7 +121,7 @@ const ContactSection: React.FC = () => {
                   <FormOutlined className="text-green-600" /> Isi form pendaftaran online
                 </li>
                 <li className="flex items-center gap-2">
-                  <TeamOutlined className="text-blue-600" /> Join Discord server untuk interview singkat
+                  <TeamOutlined className="text-blue-600" /> Join Saluran WA untuk interview singkat
                 </li>
                 <li className="flex items-center gap-2">
                   <CalendarOutlined className="text-orange-600" /> Ikuti orientation session
